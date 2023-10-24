@@ -1,0 +1,126 @@
+---
+title: "Pull Request Exercise with Kenya Climate Data"
+output: html_document
+date: "`r Sys.Date()`"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Assignment Instructions:
+
+#### Follow VERY carefully and in order!
+
+1.  If you haven't yet, **fork** the Week-1-Intro repo from our class GitHub organization (ENV-Data-Sci-FA23).
+
+2.  Make sure your local repository has all the files/changes your instructors added. To do so go to **your** forked Week-1-Intro repo, in the bar along the top click the 'Sync' dropdown and if the button says 'Update Branch', click it.
+
+3.  **SAVE** this file (in the same folder this one is located) with **YOUR** name instead of 'YOURNAME' in the file name.
+
+4.  Complete the sequence of coding tasks below (to the best of your ability).
+
+5.  Save, Add, Commit, and Push your changes to this file.
+
+6.  Go to **your** forked Week-1-Intro Repo, click the 'Contribute' drop down at the top and click the 'Open Pull Request' button (if this is grayed out that means you have not pushed any changes to GitHub yet).
+
+7.  Provide a title, short description/notes of your changes, and most importantly under 'Reviewers' on the right, type in the username of your **assigned PR reviewer** (which you can find in the 'PR_reviewer_assignments.md' document in this repository. When you are all set, submit the pull request.
+
+8.  **Review your assigned pull request**. You should receive a notification either via GitHub (you can check by clicking the 'notifications' icon directly next to your profile photo in the upper right corner), or you will receive an email link to the email you registered your GitHub account to.
+
+    Follow [these guidelines for reviewing a pull request](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/reviewing-changes-in-pull-requests/reviewing-proposed-changes-in-a-pull-request), give some meaningful feedback, and when you're done 'Approve' the pull request (do NOT close or merge).
+
+## The coding exercise:
+
+Work through the steps below to complete this exercise (to the best of your ability) and then save, add, commit and push this file with your coding edits to your forked repo and follow the instructions above for completing the assignment via creating and reviewing a pull request.
+
+Load in the tidyverse (only package(s) needed for this exercise:
+
+```{r}
+library(tidyverse)
+```
+
+Read in the 'kenya_county_climates.csv' in the 'data/' folder and assign it to an environmental variable (Hint: use 'read_csv()').
+
+```{r}
+environmental_data <- read.csv("data/kenya_county_climates.csv")
+```
+
+Write a chain of operations that does the following:
+
+1.  `select()` just the columns that have "Precipitation" in the name (so we are only interested in the precipitation data), AND the 'County' column.
+
+2.  `filter()` all the rows where 'Precipitation_585_90' is **greater than** the mean of all county precipitation values.
+
+3.  `pivot_longer()` all the precipitation columns (so everything *except* 'County'), so we have one column for all precip values and one column with the value's associated variables.
+
+```{r}
+library(dplyr)
+library(tidyr)
+
+environmental_data %>%
+  select(matches("Precipitation") | County) %>%  # Step 1
+  filter(Precipitation_585_90 > mean(unlist(select(., -County)), na.rm = TRUE)) %>%  # Step 2
+  pivot_longer(cols = -County, names_to = "Variable", values_to = "Value")  # Step 3
+
+```
+
+Question: How many counties have predicted precip values greater than the total average for all counties?
+
+Using the new dataset created above, create a bar plot of precipitation for each time frame for each county using `facet_wrap()`
+
+```{r}
+# Calculate the total average for all counties
+total_average <- mean(environmental_data$Value, na.rm = TRUE)
+
+# Count the number of counties with predicted precip values greater than the total average
+count_counties_above_average <- environmental_data %>%
+  filter(Value > total_average) %>%
+  distinct(County) %>%
+  nrow()
+
+cat("Counties with predicted precip values greater than the total average:", count_counties_above_average, "\n")
+
+```
+
+```{r}
+library(ggplot2)
+
+ggplot(environmental_data, aes(x = Variable, y = Value)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  facet_wrap(~ County, ncol = 3) +
+  labs(title = "Precipitation by County",
+       x = "Variable",
+       y = "Precipitation") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+CHALLENGE:
+
+This is messy though since we have so many counties. Instead, use `map()` to create an individual bar plot for each County (hint: create a vector of county names from the data, and building off the ggplot code you made above, add in a line to `filter()` out each county (i.e., .x) before creating the plot. AND, no more need to `facet_wrap()` here).
+
+There are many ways to do this!
+
+```{r}
+library(purrr)
+
+# Extract a vector of unique county names from the data
+county_names <- unique(environmental_data$County)
+
+# Create individual bar plots for each county
+plots <- map(county_names, function(county) {
+  kenya_climates %>%
+    filter(County == county) %>%
+    ggplot(aes(x = Variable, y = Value)) +
+    geom_bar(stat = "identity", position = "dodge") +
+    labs(title = paste("Precipitation in", county),
+         x = "Variable",
+         y = "Precipitation") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+})
+
+# Print the individual bar plots
+walk(plots, print)
+
+```
