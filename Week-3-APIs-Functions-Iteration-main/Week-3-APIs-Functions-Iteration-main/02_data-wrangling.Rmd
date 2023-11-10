@@ -57,7 +57,32 @@ parkwide <- years %>%
 **Using the `unit_visitation()` function from the last lesson and mapping, pull visitor data from 1980-2021 for the following park units: ROMO, ACAD, LAKE, YELL, GRCA, ZION, OLYM, and GRSM. Name the final output `units`.**
 
 ```{r}
+unit_visitation <- function(park_unit, start_month = "1", start_year, end_month = "12", end_year) {
+  # Create the URL for the API request using provided arguments
+  url <- paste0("https://irmaservices.nps.gov/v3/rest/stats/visitation?",
+                "unitCodes=", park_unit,
+                "&startMonth=", start_month,
+                "&startYear=", start_year,
+                "&endMonth=", end_month,
+                "&endYear=", end_year)
 
+  # Pull in the data
+  raw_data <- httr::GET(url)
+
+  # Convert content to text
+  extracted_data <- httr::content(raw_data, as = "text", encoding = "UTF-8")
+
+  # Parse text from JSON to data frame
+  final_data <- jsonlite::fromJSON(extracted_data)
+
+  return(final_data)
+}
+
+parks <- c("ROMO", "ACAD", "LAKE", "YELL", "GRCA", "ZION", "OLYM", "GRSM")
+
+parkwide <- parks %>% 
+  map(~ parkwide_visitation(year = .x)) %>% 
+  bind_rows()
 ```
 
 ## Exploring our data
