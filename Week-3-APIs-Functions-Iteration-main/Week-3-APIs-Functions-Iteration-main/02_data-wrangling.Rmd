@@ -50,6 +50,7 @@ years <- (1980:2021)
 parkwide <- years %>% 
   map(~ parkwide_visitation(year = .x)) %>% 
   bind_rows()
+parkwide
 ```
 
 ### Exercise #1 {style="color: maroon"}
@@ -80,9 +81,10 @@ unit_visitation <- function(park_unit, start_month = "1", start_year, end_month 
 
 parks <- c("ROMO", "ACAD", "LAKE", "YELL", "GRCA", "ZION", "OLYM", "GRSM")
 
-parkwide <- parks %>% 
-  map(~ parkwide_visitation(year = .x)) %>% 
+units <- parks %>% 
+  map(~ unit_visitation(park_unit = ., start_year = "1980", end_year = "2021")) %>% 
   bind_rows()
+units
 ```
 
 ## Exploring our data
@@ -153,6 +155,26 @@ plotly::ggplotly(
 **Create an interactive graph with two separate panes: one showing park-wide visitation, the other showing all the individual park units together. Both panes should have different y-axes.**
 
 ```{r}
+# Park-wide visitation
+parkwide_plot <- ggplot(data = annual_visitation) +
+  geom_point(aes(x = Year, y = RecVisitation, color = UnitCode)) +
+  geom_path(aes(x = Year, y = RecVisitation, color = UnitCode)) +
+  scale_y_continuous(labels = scales::label_scientific()) +
+  theme_bw(base_size = 10) +
+  labs(title = "Park-wide Visitation")
+
+# Individual park units
+units_plot <- ggplot(data = units) +
+  geom_point(aes(x = Year, y = RecVisitation, color = UnitCode)) +
+  geom_path(aes(x = Year, y = RecVisitation, color = UnitCode)) +
+  scale_y_continuous(labels = scales::label_scientific()) +
+  facet_wrap(~UnitCode, scales = "free_y") +
+  theme_bw(base_size = 10) +
+  labs(title = "Individual Park Units Visitation")
+
+
+# Combine both plots
+gridExtra::grid.arrange(parkwide_plot, units_plot, ncol = 1)
 
 ```
 
@@ -186,7 +208,28 @@ long_data <- wide_data %>%
 **Using `wide_data` as the starting point, create an interactive time series plot showing the annual percentage of the total visitation made up by all park units. In other words, a visual that allows us to see how much each park unit contributes to the total park visitation across the NPS system.**
 
 ```{r}
- 
+
+# Calculate the total visitation for each year
+wide_data <- wide_data %>%
+  mutate(TotalVisitation = rowSums(select(., -Year)))
+
+# Calculate the percentage contribution of each park unit
+percentage_data <- wide_data %>%
+  mutate(across(starts_with("Park"), ~ . / TotalVisitation * 100)) %>%
+  select(Year, starts_with("Park"))
+
+# Pivot the data for plotting
+melted_data <- percentage_data %>%
+  pivot_longer(cols = starts_with("Park"), names_to = "Park", values_to = "Percentage")
+
+# Create an interactive time series plot
+plot <- plot_ly(melted_data, x = ~Year, y = ~Percentage, color = ~Park, type = "scatter", mode = "lines+markers") %>%
+  layout(title = "Annual Percentage of Total Visitation by Park Units",
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "Percentage"))
+plot
+
+
 ```
 
 ## Joining
@@ -195,6 +238,7 @@ Another way of getting park-wide visitation side-by-side with the park unit data
 
 ```{r}
 joined_data <- inner_join(x = units, y = parkwide, by = c("Year","Month"))
+str(joined_data)
 ```
 
 ... where `x` and `y` are the two data sets you want joined, and `by` indicates the column(s) to match them by. Note: there are several ways of joining data. Explore them with `` ?`mutate-joins` `` and `` ?`filter-joins` ``.
@@ -204,13 +248,59 @@ joined_data <- inner_join(x = units, y = parkwide, by = c("Year","Month"))
 **Using `joined_data` as the starting point, create an interactive time series plot showing the annual percentage of the total visitation made up by all park units. This plot should look nearly identical to the previous plot.**
 
 ```{r}
+# Remove unnecessary columns
+joined_data <- joined_data %>%
+  select(-UnitCode.y, -UnitName.y)
+
+# Calculate the total visitation for each year
+joined_data <- joined_data %>%
+  mutate(TotalVisitation = rowSums(select(., -Year, -Month)))
+
+# Calculate the percentage contribution of each park unit
+percentage_data <- joined_data %>%
+  mutate(across(starts_with("UnitCode.x"), ~ . / TotalVisitation * 100)) %>%
+  select(Year, starts_with("UnitCode.x"))
+
+# Pivot the data for plotting
+melted_data <- percentage_data %>%
+  pivot_longer(cols = starts_with("UnitCode.x"), names_to = "UnitCode", values_to = "Percentage")
+
+# Create an interactive time series plot
+plot <- plot_ly(melted_data, x = ~Year, y = ~Percentage, color = ~UnitCode, type = "scatter", mode = "lines+markers") %>%
+  layout(title = "Annual Percentage of Total Visitation by Park Units",
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "Percentage"))
+plot
+
 
 ```
+
 
 ### Exercise #5 {style="color: maroon"}
 
 **Which park on average has the most visitation? Which park has the least visitation? Base your response on the data starting in 1990, ending in 2021. Defend your answer with numbers!**
 
 ```{r}
+# Filter data for the period from 1990 to 2021
+average_visitation_data <- visitation %>%
+  filter(Year >= 1990 & Year <= 2021)
+
+# Calculate average annual recreational visitors for each park unit
+average_visitation_summary <- average_visitation_data %>%
+  group_by(UnitCode) %>%
+  summarize(AvgRecVisitation = mean(RecreationVisitors, na.rm = TRUE))
+
+# Identify the park with the most and least average visitation
+most_visited_park <- average_visitation_summary %>%
+  filter(AvgRecVisitation == max(AvgRecVisitation))
+
+least_visited_park <- average_visitation_summary %>%
+  filter(AvgRecVisitation == min(AvgRecVisitation))
+
+# Display the results
+most_visited_park
+least_visited_park
 
 ```
+
+Parkwide park has the most number of visitation with an average number of 23570689 visitors and ACAD park has the least number of visitation with an average number of 219688.8 visitors.
