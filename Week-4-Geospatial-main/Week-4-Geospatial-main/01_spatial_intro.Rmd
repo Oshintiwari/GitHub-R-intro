@@ -128,6 +128,8 @@ By default, the `tigris` package imports spatial data in `sf` format, which stan
 
 For example, we are going to do an exercise for the Poudre Canyon Highway, so we want to filter out the roads data set to only those features. Using your investigative geography skills and your interactive map, find the highway on your map and find out what the exact 'FULLNAME' attribute is, and use that to `filter()` the data set. Call the new roads feature `poudre_hwy`.
 
+
+
 ```{r}
 poudre_hwy <- co_roads %>% 
   filter(FULLNAME == "Poudre Canyon Hwy")
@@ -352,8 +354,14 @@ rast("data/poudre_elevation.tif")
 1.  **Explore the use of `extract` from the `terra` package by running `?terra::extract`. (Note we need to specify `terra::` because 'extract' is a function name in multiple packages we may have loaded in our session).**
 
     **How would you extract the elevation at each of the three points in `poudre_points_prj` ? (2 pts)**
+```{r}
+?terra::extract
+```
 
     ```{r}
+elevation_at_points <- extract(co_elevation_crop, poudre_points_prj)
+
+elevation_at_points
 
     ```
 
@@ -362,23 +370,63 @@ rast("data/poudre_elevation.tif")
 Import the county boundaries for your state:
 
 ```{r}
-
+# 1. Import county boundaries for California
+ca_counties <- counties(state = "CA")
+names(ca_counties)
 ```
 
 Import elevation for your state (using your new counties object as the extent/bounding box and set `z = 7`):
 
 ```{r}
-
+# 2. Import elevation for California
+ca_elevation <- get_elev_raster(ca_counties, z = 7)
 ```
 
 Create an interactive map of your state counties and the elevation layer underneath (*note:* use `?qtm` to see the argument options for `fill =` to draw only the county borders, i.e. remove the fill color).
 
-```{r}
 
+```{r}
+tmap_mode("view")
+
+qtm(ca_counties, fill = NULL) +
+  qtm(ca_elevation)
+```
+
+```{r}
+ca_counties
 ```
 
 Choose a single county within your state county object, and crop your elevation layer to the extent of that county (*note:* use `filter()` to create an object of just your selected county that you want to crop to). Follow the steps above we used to crop `co_elevation` to the poudre hwy.
 
 ```{r}
+la_county <- ca_counties %>% 
+  filter(NAME == "Los Angeles")
+```
+
+
+```{r}
+class(ca_elevation)
+```
+
+```{r}
+ca_elevation <- rast(ca_elevation)
+```
+
+```{r}
+class(ca_elevation)
+class(la_county)
+```
+
+
+```{r}
+ca_elevation_crop <- crop(ca_elevation, ext(la_county))
+```
+
+```{r}
+# Plot the cropped elevation layer
+tm_shape(ca_elevation_crop) +
+  tm_raster() +
+  tm_layout(legend.show = FALSE)
 
 ```
+
