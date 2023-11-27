@@ -85,6 +85,9 @@ st_crs(rivers) == st_crs(occ_sp)
 The CRS of our objects does not match. Using what you learned in week one, conduct a spatial transformation to our `occ_sp` object to coerce it to the same CRS of our `rivers` object. Call the new object `occ_prj` and double check that `rivers` and our new occurrences object are in the same CRS after transforming
 
 ```{r}
+occ_prj <- st_transform(occ_sp, crs = st_crs(rivers))
+
+st_crs(occ_prj) == st_crs(rivers)
 
 ```
 
@@ -106,6 +109,11 @@ Use `?st_filter` to explore the use of the function, and then use it to filter o
 *Note:* You will first need to create a spatial object of just Larimer county to use as a filter.
 
 ```{r}
+larimer_county <- counties %>%
+  filter(NAME == "Larimer") %>%
+  st_transform(crs = st_crs(occ_prj))
+
+occ_larimer <- st_filter(occ_prj, larimer_county)
 
 ```
 
@@ -143,11 +151,22 @@ Cool, now you have the distance to the nearest river (in meters) for each indivi
 *Hint*: remember that the new distance column is a 'units' data type will throw an error when you try to plot those values. You will need to make use of `mutate()` and `as.numeric` within your string of operations in order to complete task.
 
 ```{r}
+species_avg_dist <- occ_larimer %>% 
+  group_by(Species) %>% 
+  summarise(avg_dist = mean(as.numeric(river_dist_m)))
+
+ggplot(species_avg_dist, aes(x = reorder(Species, avg_dist), y = avg_dist)) +
+  geom_bar(stat = "identity", fill = "skyblue") +
+  labs(x = "Species", y = "Average Distance to River (m)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 
 ```
 
 Which species is, on average, found closest to a river?
+
+Elk species was found closest to a river with an average distance of around 1200m to a river.
 
 ## Buffers
 
@@ -229,6 +248,14 @@ freq(landcover)
 Create a bar chart of landcover frequency, and order the bars highest to lowest (see [this resource](https://sebastiansauer.github.io/ordering-bars/) to guide you on sorting bars by a numeric variable/column). Also investigate the use of `coor_flip()` and how it might make your plot look better...
 
 ```{r}
+landcover_freq <- freq(landcover)
+landcover_freq <- landcover_freq[order(landcover_freq$count, decreasing = TRUE), ]
+
+ggplot(landcover_freq, aes(x = value, y = count)) +
+  geom_bar(stat = "identity", fill = "pink") +
+  labs(x = "Landcover Class", y = "Frequency") +
+  theme_minimal() +
+  coord_flip()
 
 ```
 
@@ -248,6 +275,7 @@ forest[forest %in% c("Deciduous Forest", "Evergreen Forest", "Mixed Forest")] <-
 #now set all non forest pixels to NA
 forest[forest != 1] <- NA
 ```
+
 
 Now plot the new forest layer to get a quick sense if it looks accurate or not.
 
@@ -317,6 +345,11 @@ Value and NLCD.Land.Cover.Class are our cell value - class pairs. Now we want to
 Perform the appropriate `*_join` operation to tie our `county_landcover` and `classes` data frames together. Then make a map of the counties each colored/filled by the most common NLCD land cover class.
 
 ```{r}
+county_landcover <- left_join(county_landcover, classes)
+
+qtm(counties) +
+  tm_fill(col = "NLCD Land Cover Class", title = "Land Cover Class", palette = "viridis") +
+  tm_borders()
 
 ```
 
@@ -327,5 +360,15 @@ Find the average elevation each species occurs at (for all Colorado occurrences)
 *Hints*: Use the `elevation` and `occ_prj` objects we have created or read in above. Remember to check the CRS and perform a spatial transformation if necessary! All parts needed to answer this question have been introduced in this lesson plan.
 
 ```{r}
+elevation_values <- extract(elevation, occ_prj)
+
+occ_prj <- cbind(occ_prj, elevation = as.numeric(elevation_values))
+
+species_avg_elevation <- occ_prj %>%
+  group_by(Species) %>%
+  summarise(avg_elevation = mean(elevation, na.rm = TRUE))
+
+species_highest_elevation <- species_avg_elevation[which.max(species_avg_elevation$avg_elevation), ]
+species_highest_elevation
 
 ```
