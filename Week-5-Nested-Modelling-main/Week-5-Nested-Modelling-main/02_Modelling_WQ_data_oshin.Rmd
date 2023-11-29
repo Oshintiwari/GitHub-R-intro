@@ -11,8 +11,8 @@ editor_options:
   chunk_output_type: console
 ---
 
-```{r setup, warnings='hide, message=FALSE}
-source('setup.R')
+```{r}
+source("setup.R")
 ```
 
 Now we have a 'tidy' data set from our previous lesson, this includes both discharge data and concentration data. Let's look at the data we have. First where is the data?
@@ -268,17 +268,31 @@ The above workflow really focuses on trend detection with Sens slope, but here w
 
 Use `inner_join` to join our daily discharge data (`Q.RDS`) to our raw water quality data (`tidied_full_wq.RDS`). You want to join by both date and siteid. Remember! the discharge data has site IDs that we had to drop the `USGS-` from, so you will need to add that back in using `paste0`.
 
-```{r}
 
-#<<<< YOUR CODE HERE >>>>#
+```{r}
+q_data$siteid <- paste0('USGS-', q_data$siteid)
+
+colnames(q_data)[colnames(q_data) == "Date"] <- "date"
+
+joined_data <- inner_join(wq, q_data, by = c("date", "siteid"))
+
 
 ```
 
 ### Pick any site and ion combination and plot discharge versus ion concentration
 
 ```{r}
+selected_site <- 'USGS-09034500'
+selected_parameter <- 'Calcium'
 
-#<<<< YOUR CODE HERE >>>>#
+selected_data <- joined_data %>%
+  filter(siteid == selected_site, parameter == selected_parameter)
+
+ggplot(selected_data, aes(x = Flow, y = conc)) +
+  geom_point() +
+  labs(title = paste("Discharge vs", selected_parameter, "for Site", selected_site),
+       x = "Discharge", y = selected_parameter)
+
 
 ```
 
@@ -289,8 +303,12 @@ Use `inner_join` to join our daily discharge data (`Q.RDS`) to our raw water qua
 Group your data by basin and water quality parameter and nest the data.
 
 ```{r}
+grouped_data <- joined_data %>%
+  group_by(basin, parameter) %>%
+  nest()
 
-#<<<< YOUR CODE HERE >>>>#
+grouped_data
+
 
 ```
 
@@ -299,8 +317,8 @@ Group your data by basin and water quality parameter and nest the data.
 You will need to use a `map` command like this: `map(data, ~lm(conc ~ q, data = .x))`
 
 ```{r}
-
-#<<<< YOUR CODE HERE >>>>#
+grouped_data <- grouped_data %>%
+  mutate(mods = map(data, ~ lm(conc ~ Flow, data = .x)))
 
 ```
 
@@ -310,7 +328,10 @@ You should have a new column called `mods` or something similar, and you need to
 
 ```{r}
 
-#<<<< YOUR CODE HERE >>>>#
+grouped_data <- grouped_data %>%
+  mutate(tidy_mods = map(mods, tidy))
+
+grouped_data
 
 
 ```
@@ -318,9 +339,16 @@ You should have a new column called `mods` or something similar, and you need to
 ## Make a visual of your models' summaries that shows both which sites have significant relationships between discharge and concentration and the slope of that relationship.
 
 ```{r}
+tidy_data <- grouped_data %>%
+  unnest(tidy_mods)
 
-#<<<< YOUR CODE HERE >>>>#
-
+ggplot(tidy_data, aes(x = term, y = estimate, color = basin)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = estimate - std.error, ymax = estimate + std.error), width = 0.2) +
+  labs(title = "Linear Model Summaries for Discharge vs Concentration",
+       x = "Term", y = "Estimate", color = "Basin") +
+  facet_wrap(~parameter, scales = "free_y") +
+  theme_minimal()
 
 ```
 
@@ -328,4 +356,9 @@ You should have a new column called `mods` or something similar, and you need to
 
 Look up the `furrr` package. What does `furrr::map` do that is different from `purrr::map`?
 
+The furrr::map function is similar to purrr::map, but it provides a parallel version of the function. It's useful when we want to parallelize the code and speed up the execution of multiple independent tasks. furrr allows to easily switch between sequential and parallel execution without changing the code structure.
+
+
 When would you want to use this `furrr` function?
+
+We might want to use furrr::map when we have a large dataset, and each element of the dataset can be processed independently. By parallelizing the tasks, we can take advantage of multiple cores or nodes, leading to faster computations.
